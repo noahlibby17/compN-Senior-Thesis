@@ -1,0 +1,104 @@
+% Get the screen numbers
+screens = Screen('Screens');
+
+% Draw to the external screen if avaliable
+screenNumber = max(screens);
+
+% Get size of screen
+[s_width, s_height]=Screen('WindowSize', screenNumber); %also found in windowRect below
+
+% Get value of color black & white, set other RGB color values for later:
+black = BlackIndex(screenNumber);
+white = WhiteIndex(screenNumber);
+gray = white/2;
+lightgray = [220, 220, 220];
+green = [0, 255, 0];
+red = [255, 0, 0];
+blue = [30, 144, 255]; %now Dodger Blue b/c original is too dark [0, 0, 255];
+yellow = [255, 255, 0];
+
+[window, windowRect] = PsychImaging('OpenWindow', screenNumber, white);
+
+% Set the blend function for the screen
+Screen('BlendFunction', window, 'GL_SRC_ALPHA', 'GL_ONE_MINUS_SRC_ALPHA');
+
+% Get the size of the on screen window in pixels
+% For help see: Screen WindowSize?
+[screenXpixels, screenYpixels] = Screen('WindowSize', window);
+
+% Get the centre coordinate of the window in pixels
+% For help see: help RectCenter
+[xCenter, yCenter] = RectCenter(windowRect);
+
+%%%UNCOMMENT WHEN ACTUALLY RUNNING
+% Run the sync tests
+%Screen('Preference', 'SkipSyncTests', 1);
+
+source = 'C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\PIG\PIG1\PIG1.jpg';
+image = imread(source);
+image_texture = Screen('MakeTexture', window, image); % make image textures - make them color?
+Screen('DrawTexture', window, image_texture, [], );
+
+% Set the key code for the OS
+KbName('UnifyKeyNames');
+space_key = KbName('space');
+
+DrawFormattedText(window, 'Press the Space Bar to pause the name reveal and make your guess', 'center', 'center', black);
+Screen('Flip', window);
+WaitSecs(1);
+
+DrawFormattedText(window, 'O_____ the Otter' , 'center', 'center', black);
+Screen('Flip', window);
+
+enter = ' ';
+
+
+name = 'Oliver';
+
+% while kbstrokewait
+% for loop
+% end, end
+
+mark_1 = 0;
+% loop slow reveal of name - press 'spacebar' to pause the loop
+for letter = 1:length(name)
+
+    display = [name(1:letter), '_________ the Otter']; % change this to update the underscores?
+    DrawFormattedText(window, display, 'center', 'center', black);
+    Screen('Flip', window);
+    
+    time = GetSecs;
+    breakflag = 0;
+    while GetSecs-time<1; % wait 1 second for a key press to signify participant is ready to respond
+        [keyIsDown] = KbCheck;
+        if keyIsDown == 1
+            DrawFormattedText(window, display, 'center', 'center', black);
+            Screen('Flip', window);
+            [response, RT] = GetEchoStringVertImg(window, enter, xCenter, yCenter, image_texture); % HOW DO I keep the image on the screen at the same time?
+            check = EditDist(response, upper('Elephant')); % change 'elephant' to var name
+            % CHECK to see if the response is close enough to be considered
+            % correct. MARK this as 'learned' if this is so
+            breakflag = 1; % allows for breaking out of nested loop
+            break % break out of loop if they respond in any way
+        end
+    end % if no response, move on to next letter
+    if breakflag == 1
+        break % breaks out of nested loop
+    end
+ 
+    if letter > (length(name))/2 % if more than half of the word has been presented
+        % SHOW THE WHOLE WORD %
+        DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black);
+        mark_1 = 0; % keep it the same
+        break % REPEAT THIS ANIMAL - how do I do this?
+    end
+    
+end
+
+
+
+
+disp(a);
+
+KbStrokeWait;
+sca;

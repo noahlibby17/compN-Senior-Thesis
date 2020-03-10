@@ -1,0 +1,1027 @@
+function CompN_Learn()
+
+% Name: Senior Project Competition Learning Phase
+% Author: Noah Libby
+% Thanks to Justin Hulbert, Peter Scarfe, and Zall Hirschstein for code help and inspiration
+
+%% Figure out which computer we're using
+
+try %my computer
+    cd('C:\Users\Admin\Desktop\noahSPROJ');
+    WORKING_DIR = 'C:\Users\Admin\Desktop\noahSPROJ';
+catch
+    cd('~/Desktop/noahSPROJ/');
+    WORKING_DIR = '~/Desktop/noahSPROJ/';
+end
+
+sca
+
+cd(WORKING_DIR)
+
+% Check we're in the right directory
+assert(logical(exist('./stimuli','dir')),...
+    sprintf('(*) "stimuli" directory does not exisit in: %s',pwd));
+
+% Set the key code for the OS
+
+if ismac
+    return_key = 40;
+elseif isunix
+    return_key = 37;
+elseif ispc
+    return_key = 13;
+end;
+
+%% Set up Psychtoolbox
+% Clear workspace
+sca;
+close all;
+clearvars;
+
+% Version Number
+VERSION_NO = 1.0;
+
+% Default PTB settings
+PsychDefaultSetup(2);
+
+DEBUG_ME = 0;
+if DEBUG_ME == 1
+    PsychDebugWindowConfiguration(0,0.5) %set background to semi-transparent to see command window
+end
+
+% Reseed the random-number generator for each experiment run
+rng('shuffle'); %this is the new way that sets the initial seed using date/time
+
+Hz = 60; %the frame rate of the monitor to be used for the main phase; at 60Hz refresh (standard for LCD), that's 1/60Hz = ~16.67ms per frame; so 116.7ms is 7 frames | 133.3ms is 8 frames use this to establish the jitter time\
+
+%% Collect subject information and prepare stim/output files
+
+prompt = {'Enter subject number:', 'CB'}; %description of fields
+defaults = {'','1-2'}; %you can put in default responses
+answer = inputdlg(prompt, 'Subject Number',1.4,defaults); %opens dialogue
+SUBJECT = answer{1,:}; %Extract Subject Number
+CB = answer{2,:}; %Indicates the counterbalancing condition for sound play (1-18; see sound_cond_lookup below)
+c = clock; %Current date and time as date vector. [year month day hour minute seconds]
+
+% This erases any spaces in the inputs
+SUBJECT = strrep(SUBJECT,' ','');
+CB = strrep(CB,' ','');
+
+% Prompts experimenter to double-check subject information - make experimenter
+% enter data in TWICE and checks those against eachother
+answer2 = inputdlg(prompt, 'Subject Number',1.4,defaults); %opens dialogue
+SUBJECT2 = answer2{1,:}; %Extract Subject Number
+CB2 = answer2{2,:}; %Indicates the counterbalancing condition for sound play (1-18; see sound_cond_lookup below)
+
+% This erases any spaces in the inputs
+SUBJECT2 = strrep(SUBJECT2,' ','');
+CB2 = strrep(CB2,' ','');
+
+% Creates arrays for both inputs
+aarray = [SUBJECT, CB];
+barray = [SUBJECT2, CB2];
+
+% Check if the arrays are equal
+doublecheck = isequal(aarray,barray);
+try
+    assert(isequal(doublecheck,1),'Invalid participant information. Please enter again.');
+catch
+    % Error. Close screen, show cursor, rethrow error:
+    ShowCursor;
+    Screen('CloseAll');
+    %clc; %clear command window
+    fclose('all');
+    Priority(0);
+    psychrethrow(psychlasterror);
+end
+
+%% ensure that this is saving properly
+baseName=[SUBJECT '_CB' CB '_' mfilename() '_' num2str(c(2)) '_' num2str(c(3))]; %makes unique output filename for this phase
+
+%% Set timing constants
+ITI = 4; %change to actual numbers
+ISI = 2; %change to actual numbers
+%% Set up stimulus file (load in one if it already exists)
+
+stim_filename = ['results/subject_sets/CompN_' SUBJECT '_stims.mat'];
+
+if exist(stim_filename,'file') == 2
+    % If stimulus set already exists for this subect, read it in.
+    fprintf('(*) stim file exists!: %s\n(*) reading it in ...\n',stim_filename);
+    load(stim_filename); % 'stimuli' variable
+    
+    AnimalMatrix = stimuli.AnimalMatrix;
+    AnimalMatrix_TwoMembers = stimuli.AnimalMatrix_TwoMembers;
+    AnimalMatrix_SixMembers = stimuli.AnimalMatrix_SixMembers;
+    AnimalMatrix_TwoMembers_Random = stimuli.AnimalMatrix_TwoMembers_Random;
+    AnimalMatrix_SixMembers_Random = stimuli.AnimalMatrix_SixMembers_Random;
+    AnimalMatrix_Full = stimuli.AnimalMatrix_Full;
+    AnimalMatrix_Learn_Random = stimuli.AnimalMatrix_Learn_Random;
+    SHUFFLEPOOL = stimuli.SHUFFLEPOOL;
+    
+else
+    
+    % If stimulus file does not exist, make a new one
+    created_time = datestr(now,0);
+    
+    %% Generate stimulus schedules
+    
+    % Word pool - ADD MORE ANIMALS/PHOTOS AND TAKE OUT GORILLA
+    POOL = {'Elephant','Giraffe','Gorilla',...
+        'Horse','Lion', 'Otter', 'Pig'};
+    
+    A_NAMES = {'Abner', 'Alden', 'Amin', 'Asher', 'Angus', 'Anton'}; %Alligator
+    B_NAMES = {'Baxter', 'Benny', 'Billy', 'Booker', 'Bradley', 'Buster'}; %Baboon
+    C_NAMES = {'Cathy', 'Cecile', 'Charlotte', 'Cindy', 'Courtney', 'Cleo'}; %Cow
+    E_NAMES = {'Edbert', 'Efren', 'Egan', 'Elden', 'Emmet', 'Ennis'}; %Elephant
+    F_NAMES = {'Felix', 'Forrest', 'Fuller', 'Freddie', 'Farrell', 'Finley'}; %Frog
+    G_NAMES = {'Garret', 'Gunther', 'Gino', 'Glenworth', 'Godwin', 'Griswold'}; %Giraffe - GOOD
+    H_NAMES = {'Hartley', 'Herbert', 'Howard', 'Hubert', 'Hinckley', 'Hyrum'}; %Horse
+    L_NAMES = {'Landin', 'Leroy', 'Lester', 'Levar', 'Linton', 'Lonnie'}; %Lion - GOOD
+    M_NAMES = {'Martin', 'Melvin', 'Miles', 'Morris', 'Murray', 'Myron'}; %Monkey
+    O_NAMES = {'Oakley', 'Odin', 'Olaf', 'Omar', 'Orrin', 'Osgood'}; %Otter - GOOD
+    P_NAMES = {'Parrish', 'Paxton', 'Prescott', 'Pearson', 'Pryor', 'Percy'}; %Pig - GOOD
+    T_NAMES = {'Teddy', 'Theo', 'Travis', 'Tyler', 'Tanner', 'Timmy'}; %Tiger
+    W_NAMES = {'Wally', 'Webster', 'Wilbur', 'Woody', 'Wyatt', 'Whitman'}; %Wolf
+    
+    % Shuffle the animal orders for condition assignment
+    SHUFFLEPOOL = randperm(length(POOL));
+    
+    % Create the two groups of family size
+    TwoMemberFam = POOL(SHUFFLEPOOL(1:length(POOL)/2));
+    SixMemberFam = POOL(SHUFFLEPOOL(length(POOL)/2+1:end));
+    
+    % Concatenate into one matrix
+    % Row 1 = TwoMemberFam; Row 2 = SixMemberFam
+    AnimalMatrix = vertcat(TwoMemberFam,SixMemberFam);
+    AnimalMatrix_Reshaped = reshape(AnimalMatrix, [], 1);
+    AnimalMatrix_TwoMembers = cell(length(TwoMemberFam)*2, 5); % save data for two member photo locations and names
+    AnimalMatrix_SixMembers = cell(length(SixMemberFam)*6, 5); % save data for six member photo locations and names
+    AnimalMatrix_Full = cell(length(TwoMemberFam)*2 + length(SixMemberFam)*6, 5); % save data for ALL photo locations and names
+    
+    %ImagesRead_TwoMembers = []; % read in all photos and save to matrix
+    % Could add read files into stimuli.read to save individually or to
+    % some other subframework
+    %ImagesRead_SixMembers = []; % read in all photos and save to matrix
+    init_two = 1; % keep track of iterations for matcat
+    init_six = 1; % keep track of iterations for matcat
+    
+    % Copy animal photos to relevant folders/get their names - iterate through each animal
+    for elm = TwoMemberFam
+        
+        member = char(elm);
+        
+        % RANDOMLY select two numbers between one and six to determine
+        % which pictures/names will be used for the two member family
+        numarray = randperm(6,2);
+        two_one_index = numarray(1);
+        two_two_index = numarray(2);
+        
+        % Find the image files
+        two_1_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(two_one_index), '\', member, num2str(two_one_index), '.jpg'];
+        two_2_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(two_two_index), '\', member, num2str(two_two_index), '.jpg'];
+        
+        % Create a cell array of the images themselves
+        Two_1_Read = imread(two_1_photo);
+        Two_2_Read = imread(two_2_photo);
+        %ImagesRead_TwoMembers = vertcat(ImagesRead_TwoMembers, [Two_1_Read, Two_2_Read]);
+        
+        % Randomize the names and create lookup matrix
+        target_name_array = eval([member(1), '_NAMES']);
+        name1 = char(target_name_array(two_one_index));
+        name2 = char(target_name_array(two_two_index));
+        Temp_Mat = {member, name1, two_1_photo, Two_1_Read, 0; member, name2, two_2_photo, Two_2_Read, 0}; % generates cell array for this loop
+        indices = (init_two*2)-1; % gets rows to paste new data into
+        AnimalMatrix_TwoMembers(indices:indices+1, 1:5) = Temp_Mat; %copies temp matrix into full set matrix
+        
+        % Copy the files using those indices to the stimulus folder for
+        % the current participant
+        two_one_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(two_one_index)];
+        two_two_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(two_two_index)];
+        destination = ['C:\Users\Admin\Desktop\noahSPROJ\results\subject_sets\', num2str(SUBJECT), '\stimuli\lowCOMP\', member, '\'];
+        %sprintf method
+        %subject_location = sprintf('%s%i%s%s%s\n', 'C:\Users\Admin\Desktop\noahSPROJ\results\subject_sets\', SUBJECT, '\stimuli\lowCOMP\', member, '\');
+        %two_one_photo = sprintf('%s%s%s%s%i', 'C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, two_one_index);
+        %two_two_photo = sprintf('%s%s%s%s%i', 'C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, two_two_index);
+        copyfile(two_one_source, destination);
+        copyfile(two_two_source, destination);
+        
+        init_two = init_two + 1;
+        disp(init_two); % vis. for debug
+        
+    end
+    
+    % Randomize images/names for high comp families
+    for elm = SixMemberFam
+        
+        member = char(elm);
+        
+        % Randomize the order of the six member families
+        numarray = randperm(6,6);
+        six_one_index = numarray(1);
+        six_two_index = numarray(2);
+        six_three_index = numarray(3);
+        six_four_index = numarray(4);
+        six_five_index = numarray(5);
+        six_six_index = numarray(6);
+        
+        % Find the image files
+        six_1_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_one_index), '\', member, num2str(six_one_index), '.jpg'];
+        six_2_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_two_index), '\', member, num2str(six_two_index), '.jpg'];
+        six_3_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_three_index), '\', member, num2str(six_three_index), '.jpg'];
+        six_4_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_four_index), '\', member, num2str(six_four_index), '.jpg'];
+        six_5_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_five_index), '\', member, num2str(six_five_index), '.jpg'];
+        six_6_photo = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_six_index), '\', member, num2str(six_six_index), '.jpg'];
+        
+        % Create a cell array of the images themselves
+        Six_1_Read = imread(six_1_photo);
+        Six_2_Read = imread(six_2_photo);
+        Six_3_Read = imread(six_3_photo);
+        Six_4_Read = imread(six_4_photo);
+        Six_5_Read = imread(six_5_photo);
+        Six_6_Read = imread(six_6_photo);
+        %member.ImagesRead_SixMembers = [Six_1_Read, Six_2_Read, Six_3_Read, Six_4_Read, Six_5_Read, Six_6_Read];
+        %ImagesRead_SixMembers = vertcat(ImagesRead_SixMembers, [Six_1_Read, Six_2_Read, Six_3_Read, Six_4_Read, Six_5_Read, Six_6_Read]);
+        
+        % Randomize the names and create lookup matrix
+        target_name_array = eval([member(1), '_NAMES']);
+        name1 = char(target_name_array(six_one_index));
+        name2 = char(target_name_array(six_two_index));
+        name3 = char(target_name_array(six_three_index));
+        name5 = char(target_name_array(six_five_index));
+        name4 = char(target_name_array(six_four_index));
+        name6 = char(target_name_array(six_six_index));
+        Temp_Mat = {member, name1, six_1_photo, Six_1_Read, 0; member, name2, six_2_photo, Six_2_Read, 0; member, name3, ...
+            six_3_photo, Six_3_Read, 0; member, name4, six_4_photo, Six_4_Read, 0; member, name5, six_5_photo, Six_5_Read, 0; member, ...
+            name6, six_6_photo, Six_6_Read, 0}; % generates cell array for this loop
+        indices = (init_six * 6)-5; % gets rows to paste new data into
+        AnimalMatrix_SixMembers(indices:indices+5, 1:5) = Temp_Mat; %copies temp matrix into full set matrix
+        
+        % Copy the files using those indices to the stimulus folder for
+        % the current participant
+        six_one_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_one_index)];
+        six_two_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_two_index)];
+        six_three_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_three_index)];
+        six_four_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_four_index)];
+        six_five_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_five_index)];
+        six_six_source = ['C:\Users\Admin\Desktop\noahSPROJ\stimuli\animals\', member, '\', member, num2str(six_six_index)];
+        destination = strcat('C:\Users\Admin\Desktop\noahSPROJ\results\subject_sets\', num2str(SUBJECT), '\stimuli\highCOMP\', member, '\');
+        
+        copyfile(six_one_source, destination);
+        copyfile(six_two_source, destination);
+        copyfile(six_three_source, destination);
+        copyfile(six_four_source, destination);
+        copyfile(six_five_source, destination);
+        copyfile(six_six_source, destination);
+        
+        init_six = init_six + 1;
+        disp(init_six);
+        
+    end
+    
+    AnimalMatrix_Full(1:(length(TwoMemberFam)*2), 1:5) = AnimalMatrix_TwoMembers;
+    AnimalMatrix_Full(((length(TwoMemberFam)*2+1):(length(TwoMemberFam)*2+length(SixMemberFam)*6)), 1:5) = AnimalMatrix_SixMembers; % FIX THIS LINE
+    
+    %% Save stimulus schedule/results
+    
+    subject.SUBJECT = SUBJECT; % where do all of these write to?
+    subject.CB = CB;
+    
+    task.DEBUG_ME = DEBUG_ME;
+    task.VERSION_NO = VERSION_NO;
+    %task.STUDY_DUR = STUDY_DUR;
+    task.ITI = ITI;
+    task.ISI = ISI;
+    task.Hz = Hz;
+    
+    stimuli.filename = stim_filename;
+    stimuli.created = created_time;
+    stimuli.POOL = POOL;
+    stimuli.SHUFFLEPOOL = SHUFFLEPOOL;
+    stimuli.AnimalMatrix = AnimalMatrix;
+    stimuli.AnimalMatrix_TwoMembers = AnimalMatrix_TwoMembers;
+    stimuli.AnimalMatrix_SixMembers = AnimalMatrix_SixMembers;
+    stimuli.AnimalMatrix_TwoMembers_Random = AnimalMatrix_TwoMembers(randperm(size(AnimalMatrix_TwoMembers,1)),:); 
+    stimuli.AnimalMatrix_SixMembers_Random = AnimalMatrix_SixMembers(randperm(size(AnimalMatrix_SixMembers,1)),:);
+    stimuli.AnimalMatrix_Full = AnimalMatrix_Full;
+    stimuli.AnimalMatrix_Learn_Random = AnimalMatrix_Reshaped(randperm(size(AnimalMatrix_Reshaped, 1)), :);
+    %stimuli.AnimalMatrix_Test_Random = Defined Later On;
+    
+    %stimuli.ImagesRead_SixMembers = member.ImagesRead_SixMembers;
+    
+    save(stim_filename,'subject','task','stimuli');
+    disp(stimuli.AnimalMatrix_Learn_Random);
+    %disp(stimuli.AnimalMatrix_Test_Random);
+
+end %if not loading in preexisting stimulus file
+%% Open screen window
+
+% Get the screen numbers
+screens = Screen('Screens');
+
+% Draw to the external screen if avaliable
+screenNumber = max(screens);
+
+% Get size of screen
+[s_width, s_height]=Screen('WindowSize', screenNumber); %also found in windowRect below
+
+% Get value of color black & white, set other RGB color values for later:
+black = BlackIndex(screenNumber);
+white = WhiteIndex(screenNumber);
+gray = white/2;
+lightgray = [220, 220, 220];
+green = [0, 255, 0];
+red = [255, 0, 0];
+blue = [30, 144, 255]; %now Dodger Blue b/c original is too dark [0, 0, 255];
+yellow = [255, 255, 0];
+
+[window, windowRect] = PsychImaging('OpenWindow', screenNumber, white);
+
+% Set the blend function for the screen
+Screen('BlendFunction', window, 'GL_SRC_ALPHA', 'GL_ONE_MINUS_SRC_ALPHA');
+
+% Get the size of the on screen window in pixels
+% For help see: Screen WindowSize?
+[screenXpixels, screenYpixels] = Screen('WindowSize', window);
+
+% Get the centre coordinate of the window in pixels
+% For help see: help RectCenter
+[xCenter, yCenter] = RectCenter(windowRect);
+
+%%%UNCOMMENT WHEN ACTUALLY RUNNING
+% Run the sync tests 
+%9Screen('Preference', 'SkipSyncTests', 1);
+
+flipTime = Screen('GetFlipInterval',window); %for this particular phase (not necessarily the one used in the main TNT phase)
+slack = flipTime/2; % start any time-critical flip early enough to allow the flip to take place (use a halfflip); can be used to present at an exact time after a previous stimulus onset [e.g., for 500ms after t_prime, use: "tprime_onset = Screen('Flip', window, tfixation_onset + 0.500 - slack)"]
+
+KbName('UnifyKeyNames');
+CancelExpKey    = 'escape';
+ContinueKey     = 'return';
+
+% FixationStimuli
+Crosshair = '+';
+
+%% Start the trial run
+
+try
+     
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % EXPOSURE, STUDY, PRACTICE %
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+    % Make textures for all of the images
+    for elm = 1:length(stimuli.AnimalMatrix_Full(:,1))
+        
+        image_texture = Screen('MakeTexture', window, stimuli.AnimalMatrix_Full{elm, 4}); % make image textures - make them color?
+        stimuli.AnimalMatrix_Full{elm, 5} = image_texture; % save textures to fifth column in full matrix to access later
+        
+        save(stim_filename,'stimuli');
+    end
+    
+    % Randomize the now full matrix with references to the textures
+    stimuli.AnimalMatrix_Test_Random = stimuli.AnimalMatrix_Full(randperm(size(AnimalMatrix_Full,1)),:);
+    % Save it to the stimuli struct in subj file
+    save(stim_filename,'stimuli');
+    
+    % Set reference locations for objects
+    Resized = 150; % half of the length or height for a square image
+    x = s_width;
+    y = s_height;
+
+    % Establish picture locations for two member families
+    positions_pict1_two = [((x/4)-Resized), ((y/2)-Resized), ((x/4)+Resized), ((y/2)+Resized)];
+    positions_pict2_two = [(((x/4)*3)-Resized), ((y/2)-Resized), (((x/4)*3)+Resized), ((y/2)+Resized)];
+    
+    % Establish picture locations for six member families
+    positions_pict1_six = [((x/6)-Resized), ((y/4)-Resized), ((x/6)+Resized), ((y/4)+Resized)];
+    positions_pict2_six = [(((x/6)*3)-Resized), ((y/4)-Resized), (((x/6)*3)+Resized), ((y/4)+Resized)];
+    positions_pict3_six = [(((x/6)*5)-Resized), ((y/4)-Resized), (((x/6)*5)+Resized), ((y/4)+Resized)];
+    positions_pict4_six = [((x/6)-Resized), (((y/4)*3)-Resized), ((x/6)+Resized), (((y/4)*3)+Resized)];
+    positions_pict5_six = [(((x/6)*3)-Resized), (((y/4)*3)-Resized), (((x/6)*3)+Resized), (((y/4)*3)+Resized)];
+    positions_pict6_six = [(((x/6)*5)-Resized), (((y/4)*3)-Resized), (((x/6)*5)+Resized), (((y/4)*3)+Resized)];
+    % Establish picture locations for the center of the screen
+    positions_center    = [((x/2)-Resized), ((y/2)-Resized), ((x/2)+Resized), ((y/2)+Resized)];
+    
+    %%% START SCREEN %%%
+    
+    start_text = 'Press "Enter" when you are ready to begin';
+    DrawFormattedText(window, start_text, 'center', 'center', BlackIndex(window));
+    Screen('Flip', window);
+    
+    % Wait for participant response
+    while 0 < 1
+        [keyIsDown,~,AnswerkeyCode] = KbCheck;
+        if keyIsDown && AnswerkeyCode(KbName(ContinueKey))
+            break;
+        end
+    end
+    
+    % Instruction screen for Exposure Phase
+    expInst_text = sprintf('%s\n%s\n%s\n%s\n%s\n%s', 'Imagine that you are working at an animal sanctuary.', ...
+        'Some animal enclosures have 6 animals, while some have 2.', ...
+        'You must learn the names of all of the different animals', ...
+        'so that you can identify each animal by name when you encounter them.', ...
+        'For each species of animal, you will first see all of the members of the enclosure', ...
+        'and then you will see each member individually.');
+    DrawFormattedText(window, expInst_text, 'center', 'center', BlackIndex(window));
+    WaitSecs(0.5); % short delay between text displays for visual appearance
+    Screen('Flip', window);
+    WaitSecs(1);
+  
+    % Wait for participant response
+    while 0 < 1
+        [keyIsDown,~,AnswerkeyCode] = KbCheck; 
+        if keyIsDown && AnswerkeyCode(KbName(ContinueKey))
+            break;
+        elseif keyIsDown && AnswerkeyCode(KbName(CancelExpKey)) % change this to something other than EscapeKey
+            break; % change this to quit out of the whole experiment
+        end
+    end
+    
+    % clear out instructions
+    Screen('Flip', window);
+    
+    allstart = GetSecs;
+    
+    % Set timing intervals - set these earlier? and save to file? probably.
+    exposure_dur = 2; % duration that exposure phase is on the screen
+    stim_dur = 2; % time that stimulus is on screen in the learning phase
+    ITI = 0.5; % time between trials
+    ISI = 0.5; % time betweeen stimuli
+    EEG_wait = 2; % time to wait for EEG to record
+    
+    % Instructions
+    which_animal = 'Which animal is this?';
+    rp_inst = sprintf('%s\n%s\n%s''Please wait until the prompt appears and then type the name',...
+        'of the animal currently on the screen.',...
+        'Press "enter" when you are finished typing.');
+
+    
+    % Iterate through all of the species, picking a target species on each iteration to present first
+    for sp = 1:length(stimuli.AnimalMatrix_Learn_Random(:, 1))
+        
+        task_start = GetSecs;
+        
+        %disp(sp); % for debugging
+        species = char(stimuli.AnimalMatrix_Learn_Random(sp, 1));
+        disp(species); % for debugging
+        
+        % Get ready
+        commandwindow; %put the command window in focus (not editor)
+        %HideCursor;
+        
+        % Initalize
+        animal_count = 0;
+        
+        % check to see whether 'species' is a two/six member animal
+        % assign picture locations for exposure phase, accordingly
+        if ismember(stimuli.AnimalMatrix(1, 1), species) == 1 || ismember(stimuli.AnimalMatrix(1, 2), species) == 1 || ismember(stimuli.AnimalMatrix(1, 3), species) == 1% if species is a two member family
+            
+            %%%%%%%%%%%%%%%%%%
+            % EXPOSURE PHASE %
+            %%%%%%%%%%%%%%%%%%
+            
+            disp((GetSecs-task_start));
+            disp(GetSecs-allstart);
+            
+            helper = ismember(stimuli.AnimalMatrix_TwoMembers_Random(:,1), species); % returns validation matrix with ones and zeros
+            tmp_exposure_matrix = stimuli.AnimalMatrix_TwoMembers_Random(helper == 1, :); % creates randomized lookup matrix for this animal based on stim.am_l_r
+            
+            % Randomize the two member matrix with references to the textures
+            stimuli.AnimalMatrix_Learn_RandomWithin.(species) = tmp_exposure_matrix(randperm(size(tmp_exposure_matrix,1)),:);
+            % Save it to the stimuli struct in subj file
+            save(stim_filename,'stimuli');
+                        
+            % Prepare all of the animals
+           
+            % Animal 1
+            name = tmp_exposure_matrix(1, 2);
+            fullname1 = [char(name), ' the ', char(tmp_exposure_matrix(1, 1))];
+            disp(fullname1); % for debugging
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            %tmp_texture_1 = Screen('MakeTexture', window, stimuli.AnimalMatrix_Full{tmp_row, 5}); to make textures at the moment you need them
+            tmp_texture_1 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_1, [], positions_pict1_two);
+            DrawFormattedText(window, fullname1, 'center', 'center', black, [], [], [], [], [], [positions_pict1_two(1), positions_pict1_two(4), positions_pict1_two(3), positions_pict1_two(4)+30]);
+            
+            % Animal 2
+            name = tmp_exposure_matrix(2, 2);
+            fullname2 = [char(name), ' the ', char(tmp_exposure_matrix(2, 1))];
+            disp(fullname2); % for debugging
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            %tmp_texture_2 = Screen('MakeTexture', window, stimuli.AnimalMatrix_Full{tmp_row, 5}); to make textures at the moment you need them
+            tmp_texture_2 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture',window,tmp_texture_2, [], positions_pict2_two);
+            DrawFormattedText(window, fullname2, 'center', 'center', black, [], [], [], [], [], [positions_pict2_two(1), positions_pict2_two(4), positions_pict2_two(3), positions_pict2_two(4)+30]);
+            
+            disp('end time');
+            disp(GetSecs-allstart);
+            
+            % Flip to the screen
+            Screen('Flip', window);
+            
+            WaitSecs(exposure_dur); % replace with trial interval - keeps the stimuli up on the screen before displaying text for study phase
+            
+            %%%%%%%%%%%%%%%
+            % STUDY PHASE %
+            %%%%%%%%%%%%%%%
+            
+            % Instructions for this phase
+            studyInst_text = 'Now study them individually';
+            DrawFormattedText(window, studyInst_text, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(.5); % erase when I UNCOMMENT below block
+            
+            % UNCOMMENT to make participant respond to move on
+            % Wait for participant response
+            %while 0 < 1
+            %    [keyIsDown,~,AnswerkeyCode] = KbCheck;
+            %    if keyIsDown && AnswerkeyCode(KbName(ContinueKey))
+            %        break;
+            %    elseif keyIsDown && AnswerkeyCode(KbName(CancelExpKey)) % change this to something other than EscapeKey
+            %        break; % change this as above
+            %    end
+            %end
+            
+            % Using the 'species' variable generated by 'sp' count in the loop of Am_L_R, study each animal/name pair for x-many seconds
+            % Animal 1
+            Screen('DrawTexture', window, tmp_texture_1, [], positions_center); % save for rp phase
+            DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black); % save for rp phase
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 2
+            Screen('DrawTexture', window, tmp_texture_2, [], positions_center);
+            DrawFormattedText(window, fullname2, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % RETRIEVAL PRACTICE PHASE %
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            % Initialize marks to signify whether or not the animal has
+            % been learned
+            mark_1 = 0; mark_2 = 0;
+            
+            while mark_1 == 0 && mark_2 == 0 % could make this into own function
+                
+                % Animal 1
+                fullname1 = ['_________', ' the ', char(tmp_exposure_matrix(1, 1))];
+                Screen('DrawTexture', window, tmp_texture_1, [], positions_center); % save for rp phase
+                Screen('Flip', window);
+                WaitSecs(EEG_wait); % wait for EEG to record
+                
+                for letter = 1:length(tmp_exposure_matrix{1,2})
+                    name = tmp_exposure_matrix{1,2};
+                    display = name(letter);
+                    if letter > length(tmp_exposure_matrix{1,2})
+                        break % REPEAT THIS ANIMAL - how do I do this?
+                    end
+                end
+                
+            end
+            
+            
+            
+            for i = length(a)
+disp(a(i))
+WaitSecs(1)
+end
+            
+            
+            DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black); % save for rp phase
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 2
+            fullname2 = ['_________', ' the ', char(tmp_exposure_matrix(2, 1))];
+            Screen('DrawTexture', window, tmp_texture_2, [], positions_center);
+            DrawFormattedText(window, fullname2, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            %helper = ismember(stimuli.AnimalMatrix_TwoMembers_Random(:,1), species); % returns validation matrix with ones and zeros
+            %tmp_rp_matrix = stimuli.AnimalMatrix_TwoMembers_Random(helper == 1, :); % creates randomized lookup matrix for this animal based on stim.am_l_r
+                        
+            % Randomize the two member matrix with references to the textures
+            %stimuli.AnimalMatrix_RP_Random.(species) = tmp_rp_matrix(randperm(size(tmp_rp_matrix,1)),:);
+            % Save it to the stimuli struct in subj file
+            %save(stim_filename,'stimuli');
+            
+            % Draw the instructions for the RP phase
+            %DrawFormattedText(window, rp_inst, 'center', 'center', black);
+            
+            % Animal 1 retrieval practice
+            %name = tmp_rp_matrix(1, 2);
+            %fullname1 = ['__________', ' the ', char(tmp_rp_matrix(1,1))];
+            %[tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            %tmp_texture_1 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            %Screen('DrawTexture', window, tmp_texture_1, [], positions_center);
+            %DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black); % save for rp phase
+            %
+            %WaitSecs(EEG_wait);
+            
+            % CODE FOR TYPING IN RESPONSE AND ALGORITHM TO SEE IF ITS GOOD
+            % ENOUGH
+            
+            %[response, RT] = GetEchoStringVert(window, which_animal, x, y, black);
+            % make sure to save the response and the RT in some way -
+            % probably using fprintf but I need to find a way so that it
+            % won't overwrite the previous ones. I need a formatting for
+            % this.
+            
+            %disp(response);            
+            %compare = EditDist(response, name);
+            %disp(compare);
+            
+            
+            
+            
+            
+            %Screen('Flip', window);
+            %WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            %DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            %Screen('Flip', window);
+            %WaitSecs(ISI);
+            
+            % Animal 2 retrieval practice
+            %name = tmp_rp_matrix(2, 2);
+            %fullname2 = ['__________', ' the ', char(tmp_rp_matrix(1,1))];
+            %[tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            %tmp_texture_1 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            %Screen('DrawTexture', window, tmp_texture_1, [], positions_center);
+            %DrawFormattedText(window, fullname2, 'center', positions_center(4)+30, black); % save for rp phase
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            % Count the animals that have been presented
+            animal_count = animal_count + 1;
+            
+            % Checks to see if all animals have been presented
+            if animal_count == length(stimuli.AnimalMatrix_Learn_Random(:, 1))
+                DrawFormattedText(window, 'End of Exposure Phase', 'center', 'center', black);
+                Screen('Flip', window);
+                WaitSecs(ITI); % time to wait between exposure phase and study phase
+            else    
+                DrawFormattedText(window,'Loading next animal...', 'center', 'center', black);
+                Screen('Flip', window);
+                WaitSecs(ITI); % for debugging purposes, change to ITI
+            end
+          
+            % Clears old textures
+            %Screen('Close', [tmp_texture_1, tmp_texture_2]);
+            
+        end
+        
+        if ismember(stimuli.AnimalMatrix(2, 1), species) == 1 || ismember(stimuli.AnimalMatrix(2, 2), species) == 1 || ismember(stimuli.AnimalMatrix(2, 3), species) == 1 % if species is a six member family
+            
+            %%%%%%%%%%%%%%%%%%
+            % EXPOSURE PHASE %
+            %%%%%%%%%%%%%%%%%%
+            
+            disp((GetSecs-task_start));
+            disp(GetSecs-allstart);
+            
+            helper = ismember(stimuli.AnimalMatrix_SixMembers_Random(:,1), species); % returns validation matrix with ones and zeros
+            tmp_exposure_matrix = stimuli.AnimalMatrix_SixMembers_Random(helper == 1, :); % creates randomized lookup matrix for this animal based on stim.am_l_r
+            
+            % Randomize the two member matrix with references to the textures
+            stimuli.AnimalMatrix_Learn_RandomWithin.(species) = tmp_exposure_matrix(randperm(size(tmp_exposure_matrix,1)),:);
+            % Save it to the stimuli struct in subj file
+            save(stim_filename,'stimuli');
+
+            % Prepare all of the animals
+            
+            % Animal 1
+            name = tmp_exposure_matrix(1, 2);
+            fullname1 = [char(name), ' the ', char(tmp_exposure_matrix(1, 1))];
+            disp(fullname1);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_1 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_1, [], positions_pict1_six);
+            DrawFormattedText(window, fullname1, 'center', 'center', black, [], [], [], [], [], [positions_pict1_six(1), positions_pict1_six(4), positions_pict1_six(3), positions_pict1_six(4)+30]);
+            
+            % Animal 2
+            name = tmp_exposure_matrix(2, 2);
+            fullname2 = [char(name), ' the ', char(tmp_exposure_matrix(2, 1))];
+            disp(fullname2);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_2 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture',window,tmp_texture_2, [], positions_pict2_six);
+            DrawFormattedText(window, fullname2, 'center', 'center', black, [], [], [], [], [], [positions_pict2_six(1), positions_pict2_six(4), positions_pict2_six(3), positions_pict2_six(4)+30]);
+            
+            % Animal 3
+            name = tmp_exposure_matrix(3, 2);
+            fullname3 = [char(name), ' the ', char(tmp_exposure_matrix(3, 1))];
+            disp(fullname3);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_3 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_3, [], positions_pict3_six);
+            DrawFormattedText(window, fullname3, 'center', 'center', black, [], [], [], [], [], [positions_pict3_six(1), positions_pict3_six(4), positions_pict3_six(3), positions_pict3_six(4)+30]);
+            
+            % Animal 4
+            name = tmp_exposure_matrix(4, 2);
+            fullname4 = [char(name), ' the ', char(tmp_exposure_matrix(4, 1))];
+            disp(fullname4);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_4 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_4, [], positions_pict4_six);
+            DrawFormattedText(window, fullname4, 'center', 'center', black, [], [], [], [], [], [positions_pict4_six(1), positions_pict4_six(4), positions_pict4_six(3), positions_pict4_six(4)+30]);
+            
+            % Animal 5
+            name = tmp_exposure_matrix(5, 2);
+            fullname5 = [char(name), ' the ', char(tmp_exposure_matrix(5, 1))];
+            disp(fullname5);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_5 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_5, [], positions_pict5_six);
+            DrawFormattedText(window, fullname5, 'center', 'center', black, [], [], [], [], [], [positions_pict5_six(1), positions_pict5_six(4), positions_pict5_six(3), positions_pict5_six(4)+30]);
+            
+            % Animal 6
+            name = tmp_exposure_matrix(6, 2);
+            fullname6 = [char(name), ' the ', char(tmp_exposure_matrix(6, 1))];
+            disp(fullname6);
+            [tmp_row, ~] = find(ismember(stimuli.AnimalMatrix_Full(:,2), name));
+            tmp_texture_6 = stimuli.AnimalMatrix_Full{tmp_row, 5};
+            Screen('DrawTexture', window, tmp_texture_6, [], positions_pict6_six);
+            DrawFormattedText(window, fullname6, 'center', 'center', black, [], [], [], [], [], [positions_pict6_six(1), positions_pict6_six(4), positions_pict6_six(3), positions_pict6_six(4)+30]);
+            
+            disp('end time');
+            disp(GetSecs-allstart);
+            
+            % Flip to the screen
+            Screen('Flip', window);
+            
+            WaitSecs(exposure_dur); % keeps the animals on the screen for desired time
+            
+            %%%%%%%%%%%%%%%
+            % STUDY PHASE %
+            %%%%%%%%%%%%%%%
+            
+            % Instructions for this phase
+            studyInst_text = 'Now study them individually';
+            DrawFormattedText(window, studyInst_text, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(0.5); % change to longer or wait for participant response to continue
+            
+            % UNCOMMENT to make participant respond to move on
+            % Wait for participant response
+            %while 0 < 1
+            %    [keyIsDown,~,AnswerkeyCode] = KbCheck;
+            %    if keyIsDown && AnswerkeyCode(KbName(ContinueKey))
+            %        break;
+            %    elseif keyIsDown && AnswerkeyCode(KbName(CancelExpKey)) % change this to something other than EscapeKey
+            %        break; % change this as above
+            %    end
+            %end
+            
+            % Using the 'species' variable generated by 'sp' count in the loop of Am_L_R, study each animal/name pair for x-many seconds
+            % Animal 1
+            Screen('DrawTexture', window, tmp_texture_1, [], positions_center);
+            DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 2
+            Screen('DrawTexture', window, tmp_texture_2, [], positions_center);
+            DrawFormattedText(window, fullname2, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % stimulus duration
+            
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI); % change to ISI
+            
+            % Animal 3
+            Screen('DrawTexture', window, tmp_texture_3, [], positions_center);
+            DrawFormattedText(window, fullname3, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 4
+            Screen('DrawTexture', window, tmp_texture_4, [], positions_center);
+            DrawFormattedText(window, fullname4, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI); % change to ISI
+            
+            % Animal 5
+            Screen('DrawTexture', window, tmp_texture_5, [], positions_center);
+            DrawFormattedText(window, fullname5, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI); % change to ISI
+            
+            % Animal 6
+            Screen('DrawTexture', window, tmp_texture_6, [], positions_center);
+            DrawFormattedText(window, fullname6, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % RETRIEVAL PRACTICE PHASE %
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            
+            % Animal 1
+            fullname1 = ['_________', ' the ', char(tmp_exposure_matrix(1, 1))];
+            Screen('DrawTexture', window, tmp_texture_1, [], positions_center); % save for rp phase
+            DrawFormattedText(window, fullname1, 'center', positions_center(4)+30, black); % save for rp phase
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 2
+            fullname2 = ['_________', ' the ', char(tmp_exposure_matrix(2, 1))];
+            Screen('DrawTexture', window, tmp_texture_2, [], positions_center);
+            DrawFormattedText(window, fullname2, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 3
+            fullname3 = ['_________', ' the ', char(tmp_exposure_matrix(3, 1))];
+            Screen('DrawTexture', window, tmp_texture_3, [], positions_center);
+            DrawFormattedText(window, fullname3, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 4
+            fullname4 = ['_________', ' the ', char(tmp_exposure_matrix(4, 1))];
+            Screen('DrawTexture', window, tmp_texture_4, [], positions_center);
+            DrawFormattedText(window, fullname4, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 5
+            fullname5 = ['_________', ' the ', char(tmp_exposure_matrix(5, 1))];
+            Screen('DrawTexture', window, tmp_texture_5, [], positions_center);
+            DrawFormattedText(window, fullname5, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+            
+            % Fixation point
+            DrawFormattedText(window, Crosshair, 'center', 'center', black);
+            Screen('Flip', window);
+            WaitSecs(ISI);
+            
+            % Animal 6
+            fullname6 = ['_________', ' the ', char(tmp_exposure_matrix(3, 1))];
+            Screen('DrawTexture', window, tmp_texture_6, [], positions_center);
+            DrawFormattedText(window, fullname6, 'center', positions_center(4)+30, black);
+            Screen('Flip', window);
+            WaitSecs(stim_dur); % change to stimulus duration
+
+            
+            
+            
+            
+            
+            
+                        
+            % Counts the animals that have been presented
+            animal_count = animal_count + 1;
+                        
+            % Checks to see if all animals have been presented
+            if animal_count == length(stimuli.AnimalMatrix_Learn_Random(:, 1))
+                DrawFormattedText(window, 'End of Exposure Phase', 'center', 'center', black);
+                Screen('Flip', window);
+                WaitSecs(ITI);
+            else    
+                DrawFormattedText(window,'Loading next animal...', 'center', 'center', black);
+                Screen('Flip', window);
+                WaitSecs(ITI); % for debugging purposes, change to ITI
+            end
+            
+            % Clears old textures
+            %Screen('Close', [tmp_texture_1, tmp_texture_2, tmp_texture_3,
+            %tmp_texture_4, tmp_texture_5, tmp_texture_6]); maybe I need to
+            %wait to make the textures right before I present them. I
+            %shouldn't clear them after each round if they are all made before
+            %presentastions because then the timing will be faster as the
+            %presentations continue
+            
+        end % ends the if conditionals to determine 2 or 6 member families
+
+    end % ends the for loop for exposure/learning/initial testing phases
+    
+    %%%%%%%%%%%%%%
+    % TEST PHASE %
+    %%%%%%%%%%%%%%
+    
+    for sp = 1:length(stimuli.AnimalMatrix_Test_Random(:,1))
+        disp(sp);
+    end
+        % give on-screen and written instructions for the
+            % exposure/study/practice subphases
+            % explain different symbols
+                % fixation point
+                % symbol to indicate to wait to respond until two seconds has elapsed
+                % symbol that comes up/goes away when two seconds has elapsed
+        % explain different symbols that will be used to indicate when the  
+        % present all of the pictures and names together for the animal
+            % if it's a two/six person family, display the images differently/evenly-spaced on the screen
+        % present each picture and name individually
+        % present a fixation point between pictures
+        % randomize the order of the presentation
+        % present the animal image and the first (and second?) letter
+            % SEND trigger code at start of presentation to Emotiv
+            % wait two seconds to record EEG
+            % SEND trigger code at end of presentation
+            % after two seconds, allow the participant to type
+            % SEND trigger code at first key press
+            % SEND trigger codes at each key press?
+            % SEND trigger code once participant presses enter to indicate they have finalized their guess
+            % record the amount of time it takes them to type response
+        % create a response matrix to record responses and times    
+            % HOW MANY times to repeat each so that they're balanced across low and high competition
+            % IF guess is correct
+                % mark in response matrix
+            % ELSEIF guess is incorrect
+                % mark in response matrix
+        % once they've gotten them all correct once (or whatever metric I choose), move to next species
+        
+        % randomize order of all animal names
+            % 
+        % present each animal like above and do the test
+    
+    % Wait for keystroke to eliminate
+    KbStrokeWait;
+    
+    
+    %%%%%%%%%%%%%%%%%%%%
+    % FINAL TEST PHASE %
+    %%%%%%%%%%%%%%%%%%%%
+    
+
+    % Clear screen
+    sca
+catch
+    % Error. Close screen, show cursor, rethrow error:
+    ShowCursor;
+    Screen('CloseAll');
+    %clc; %clear command window
+    fclose('all');
+    Priority(0);
+    psychrethrow(psychlasterror);
+end
+%

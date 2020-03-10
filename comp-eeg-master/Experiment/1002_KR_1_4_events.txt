@@ -1,0 +1,4 @@
+stim	 + 	 1	0.050711	1551262446.327913
+stim	 Type the English
+translation,
+then hit enter. 	 1	5.052426	1551262451.329458

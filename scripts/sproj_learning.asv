@@ -1,0 +1,148 @@
+function CompN_Learn()
+
+% Name: Senior Project Learning Phase
+% Author: Noah Libby
+% Version: 1.0
+% Thanks to Peter Scarfe, Zall Hirschstein, and Dr. Justin Hulbert for code help and inspiration
+
+%% Set up Psychtoolbox
+% Clear workspace
+sca;
+close all;
+clearvars;
+
+% Default PTB settings
+PsychDefaultSetup(2);
+
+DEBUG_ME = 0;
+if DEBUG_ME == 1
+    PsychDebugWindowConfiguration(0,0.5) %set background to semi-transparent to see command window
+end
+
+% Reseed the random-number generator for each experiment run
+rng('shuffle'); %this is the new way that sets the initial seed using date/time
+
+% Get screen number and max screen
+screens = Screen('Screens');
+screenNumber = max(screens);
+
+% Get size of screen
+[s_width, s_height]=Screen('WindowSize', screenNumber); %also found in windowRect below
+
+% Define colors
+white = WhiteIndex(screenNumber);
+black = BlackIndex(screenNumber);
+grey = white/2;
+
+% Open an on screen window with a white background color:
+[window, windowRect] = PsychImaging('OpenWindow', screenNumber, black);
+
+% Set blend function for alpha blending
+Screen('BlendFunction', window, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+% Get the center coordinate of the window
+[xCenter, yCenter] = RectCenter(windowRect);
+
+% Set default text stuff later calls to DrawFormattedText(window, text, 'center', 'center');
+Screen('TextFont', window, 'Helvetica'); %default font
+Screen('TextSize', window, 44); %default font size
+Screen('TextStyle', window, 1); %default font style
+Screen('TextColor', window, white); %default font color
+Screen('Preference', 'TextAlphaBlending', 0); %default font transparency
+
+flipTime = Screen('GetFlipInterval',window);
+slack = flipTime/2; % start any time-critical flip early enough to allow the flip to take place (use a halfflip)
+Hz = 60; %the frame rate of the monitor to be used for the main phase; at 60Hz refresh (standard for LCD), that's 1/60Hz = ~16.67ms per frame; so 116.7ms is 7 frames | 133.3ms is 8 frames use this to establish the jitter time\
+%% Collect subject information and prepare stim/output files
+
+prompt = {'Enter subject number:', 'CB'}; %description of fields
+defaults = {'','1-2'}; %you can put in default responses
+answer = inputdlg(prompt, 'Subject Number',1.4,defaults); %opens dialogue
+SUBJECT = answer{1,:}; %Extract Subject Number
+CB = answer{2,:}; %Indicates the counterbalancing condition for sound play (1-18; see sound_cond_lookup below)
+c = clock; %Current date and time as date vector. [year month day hour minute seconds]
+
+% This erases any spaces in the inputs
+SUBJECT = strrep(SUBJECT,' ','');
+CB = strrep(CB,' ','');
+
+% Prompts experimenter to double-check subject information - make experimenter
+% enter data in TWICE and checks those against eachother
+prompt2 = {'Enter subject number:', 'SND_CB', 'PNT','DFcond'}; %description of fields
+answer2 = inputdlg(prompt, 'Subject Number',1.4,defaults); %opens dialogue
+SUBJECT2 = answer2{1,:}; %Extract Subject Number
+CB2 = answer2{2,:}; %Indicates the counterbalancing condition for sound play (1-18; see sound_cond_lookup below)
+
+% This erases any spaces in the inputs
+SUBJECT2 = strrep(SUBJECT2,' ','');
+CB2 = strrep(CB2,' ','');
+
+% Creates arrays for both inputs
+aarray = [SUBJECT, CB];
+barray = [SUBJECT2, CB2];
+
+% Check if the arrays are equal
+doublecheck = isequal(aarray,barray);
+try
+    assert(isequal(doublecheck,1),'Invalid participant information. Please enter again.');
+catch
+    % Error. Close screen, show cursor, rethrow error:
+    ShowCursor;
+    Screen('CloseAll');
+    %clc; %clear command window
+    fclose('all');
+    Priority(0);
+    psychrethrow(psychlasterror);
+end
+
+% Randomize order of animal family presentation
+animal_matrix = ['owl', 'elephant', 'tiger', 'giraffe', 'bear', 'frog', 'wolf', 'cow', 'ape', 'otter', 'horse', 'lion'];
+rand_mat = randperm(1:length(animal_matrix));
+print(rand_mat);
+
+rand_animatrix = Shuffle(animal_matrix,:);
+
+baseName=[SUBJECT '_SND_CB' SND_CB '_PNT' PNT '_DFcond' DFcond '_a' num2str(sound_cond(1,1)) '_b' num2str(sound_cond(1,2)) '_c' num2str(sound_cond(1,3)) '_' mfilename() '_' num2str(c(2)) '_' num2str(c(3))]; %makes unique output filename for this phase
+%% Set up stimulus file (load in one if it already exists)
+stim_filename = ['results/subject_sets/CompN_' SUBJECT '_stims.mat'];
+
+if exist(stim_filename,'file') == 2
+    % If stimulus set already exists for this subect, read it in.
+    fprintf('(*) stim file exists!: %s\n(*) reading it in ...\n',stim_filename);
+    load(stim_filename); % 'stimuli' variable
+    
+    List1 = stimuli.List1;
+    List2 = stimuli.List2;
+    SoundA = stimuli.SoundA;
+    SoundB = stimuli.SoundB;
+    
+else
+%% Open screen window
+[window, windowRect] = PsychImaging('OpenWindow', screenNumber, grey);
+
+% Set the blend function for the screen
+Screen('BlendFunction', window, 'GL_SRC_ALPHA', 'GL_ONE_MINUS_SRC_ALPHA');
+
+% Get the size of the on screen window in pixels
+% For help see: Screen WindowSize?
+[screenXpixels, screenYpixels] = Screen('WindowSize', window);
+
+% Get the centre coordinate of the window in pixels
+% For help see: help RectCenter
+[xCenter, yCenter] = RectCenter(windowRect);
+
+% Draw text in the middle of the screen in Courier in white
+Screen('TextSize', window, 80);
+Screen('TextFont', window, 'Courier');
+DrawFormattedText(window, rand_animal_matrix, 'center', 'center', white);
+
+% Flip to the screen
+Screen('Flip', window);
+
+% Wait for keystroke to eliminate
+KbStrokeWait;
+
+% Clear screen
+sca
+
+% 

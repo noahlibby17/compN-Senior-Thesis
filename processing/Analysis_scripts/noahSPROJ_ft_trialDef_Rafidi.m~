@@ -1,0 +1,217 @@
+
+% Add fieldtrip and its subfolders to the path
+addpath /home/mdynamics/Documents/Matlab_offcampus/fieldtrip
+ft_defaults;
+%% For each new participant:
+% Load competition.mat, KRpres.mat, KRtest.mat, and presentation.mat one at
+% time below
+% Change FileLoc to the participant's folder in 'AllData_Rafidi_Unprocessed'
+
+
+%%%%%%%%%%%%%%%%%%%%
+
+
+% change FileLoc everytime you need to load a new participant
+FileLoc = '/home/mdynamics/Desktop/noahSPROJ_participants/AllData_Rafidi_Unprocessed/1';
+cd(FileLoc);
+PreStimTime = -0.5;
+PostStimTime = 2;
+cd('/home/mdynamics/Desktop/noahSPROJ/processing/Analysis_scripts/');
+
+for NumFile = 1:length(FileList)
+    
+    %% Load and read data
+    
+    FileName = File.name;
+    FullFileName = strcat(FileLoc, '/', FileName);
+    dat = ft_read_data(FullFileName);
+    hdr = ft_read_header(FullFileName);
+    datRS = reshape(dat,size(dat,1),size(dat,2)*size(dat,3)); % Converting 3D (Channel,Samples,Epochs) matrix to 2D (Channel,Samples)
+    
+    
+    %% Identify which numbers were used as triggers for high and low competition trials in this participant
+    
+    highcomp_triglist = [];
+    lowcomp_triglist = [];
+    
+    %% LOAD Competition.mat
+    cd('/home/mdynamics/Desktop/noahSPROJ/comp-eeg-master/Experiment/');
+    
+    % Navigate to this participant's folder 
+    % LOAD competition.mat
+    % Search to find low and high comp
+    
+    for x = 1:length(experiment) % look at each block
+        cur_exp_port = experiment(x, x).parPort; % open parPort for this block
+        cur_exp_story = experiment(x, x).story; % open story for this block
+        for y = 1:length(cur_exp_port) % look at each cell in parPort for this block
+            [~, allnum_col] = find(cur_exp_port(1, :) > 0); % pull col references for cells with triggers
+            for z = 1:length(allnum_col) % once you find a trigger, find the related prompt
+                     current = cur_exp_story(1, allnum_col(z)); % current prompt for the found trigger
+                     [a,b] = strtok(current,'-'); % split the prompt by the '-'
+                     if length(a) == 2 % if it's presenting the exemplar and asking for the category
+                         lowcomp_trig = cur_exp_port(1, allnum_col(z)); % high comp trig
+                         lowcomp_triglist = lowcomp_triglist + lowcomp_trig; % bin this trigger number as high competition trigger
+                     elseif length(b) == 3 % if it's presenting the category and asking for the exemplar - len(3) includes the '-'
+                         lowcomp_trig = cur_exp_port(1, allnum_col(z)); % high comp trig
+                         lowcomp_triglist = lowcomp_triglist + lowcomp_trig; % bin this trigger number as a high competition trigger
+                     end
+            end
+        end
+    end
+              
+    %% LOAD presentation.mat and KRpres.mat
+
+      % Don't worry about loading the presentation.mat and KRpres.mat because it is not
+      % inherently low or high competition yet
+      
+    %% LOAD KRtest.mat
+    
+    cd('/home/mdynamics/Desktop/noahSPROJ/comp-eeg-master/Experiment/');
+    
+    % Navigate to this participant's folder 
+    % LOAD competition.mat
+    % Search to find low and high comp
+    
+    for x = 1:length(experiment) % look at each block
+        cur_exp_port = experiment(x, x).parPort; % open parPort for this block
+        cur_exp_story = experiment(x, x).story; % open story for this block
+        for y = 1:length(cur_exp_port) % look at each cell in parPort for this block
+            [~, allnum_col] = find(cur_exp_port(1, :) > 0); % pull col references for cells with triggers
+            for z = 1:length(allnum_col) % once you find a trigger, find the related prompt
+                     current = cur_exp_story(1, allnum_col(z)); % current prompt for the found trigger
+                     [a,b] = strtok(current,'-'); % split the prompt by the '-'
+                     if length(a) == 2 % if it's presenting the exemplar and asking for the category
+                         lowcomp_trig = cur_exp_port(1, allnum_col(z)); % high comp trig
+                         lowcomp_triglist = lowcomp_triglist + lowcomp_trig; % bin this trigger number as high competition trigger
+                     elseif length(b) == 3 % if it's presenting the category and asking for the exemplar - len(3) includes the '-'
+                         lowcomp_trig = cur_exp_port(1, allnum_col(z)); % high comp trig
+                         lowcomp_triglist = lowcomp_triglist + lowcomp_trig; % bin this trigger number as a high competition trigger
+                     end
+            end
+        end
+    end
+    
+    
+    
+    
+    
+    
+    
+    %% Repository
+            % search through cur_exp_port to find all of the numbers
+            % save the column number
+            % search through SOMETHING and find whether the thing presented at that
+            % point in time was a high or low-competition trial
+            % place it in the correct bin
+    %{        
+    [~, allnum_col] = find(datRS(20, :) > 0);    
+            experiment(i).story = tmp.story; %#ok<*SAGROW>
+    experiment(i).answer = tmp.ans;
+    experiment(i).parPort = tmp.parPort;
+    experiment(i).storyLength = tmp.len;
+    experiment(i).storyTime = cumsum([0,tmp.len]);
+    %}
+    
+    %% Identify data markers and events of interest
+    
+    cd('/home/mdynamics/Desktop/noahSPROJ/processing/Analysis_scripts/');
+    
+    % Cat/Exemplar Study
+    LowCompStart_Exp = find(datRS(20, :) == 11);
+    HighCompStart_Exp = find(datRS(20, :) == 13);
+    % Cat/Exemplar Quiz
+    LowCompStart_Study = find(datRS(20, :) == 21);
+    HighCompStart_Study = find(datRS(20, :) == 23);
+    % Swahili Study
+    LowCompStart_RP = find(datRS(20, :) == 31);
+    HighCompStart_RP = find(datRS(20, :) == 33);
+    % Swahili Quiz
+    LowCompStart_Test = find(datRS(20, :) == 41);
+    HighCompStart_Test = find(datRS(20, :) == 43);
+    
+    
+    %% Epoching/segmentation
+
+    % Hold trials
+    Trials_LowComp_RP = [];
+    Signals_LowComp_RP = [];
+    LowComp_RP_TrlInfo = ones(1,length(LowCompStart_RP))*1; % 1 - for later trial id
+    for blk = 1:length(LowCompStart_RP)
+        Trials_LowComp_RP{blk} = datRS(:,LowCompStart_RP(blk)-PreStimTime*hdr.Fs:LowCompStart_RP(blk)+PostStimTime*hdr.Fs);
+        Signals_LowComp_RP{blk} = Trials_LowComp_RP{blk}(3:16, :);
+    end
+    
+    
+    Trials_HighComp_RP = [];
+    Signals_HighComp_RP = [];
+    HighComp_RP_TrlInfo = ones(1,length(HighCompStart_RP))*2; % 2 - for later trial id
+    for blk = 1:length(HighCompStart_RP)
+        Trials_HighComp_RP{blk} = datRS(:,HighCompStart_RP(blk)-PreStimTime*hdr.Fs:HighCompStart_RP(blk)+PostStimTime*hdr.Fs);
+        Signals_HighComp_RP{blk} = Trials_HighComp_RP{blk}(3:16, :);
+    end
+
+
+    Trials_LowComp_Test = [];
+    Signals_LowComp_Test = [];
+    LowComp_Test_TrlInfo = ones(1,length(LowCompStart_Test))*3; % 3 - for later trial id
+    for blk = 1:length(LowCompStart_Test)
+        Trials_LowComp_Test{blk} = datRS(:,LowCompStart_Test(blk)-PreStimTime*hdr.Fs:LowCompStart_Test(blk)+PostStimTime*hdr.Fs);
+        Signals_LowComp_Test{blk} = Trials_LowComp_Test{blk}(3:16, :);
+    end
+    
+    
+    Trials_HighComp_Test = [];
+    Signals_HighComp_Test = [];
+    HighComp_Test_TrlInfo = ones(1,length(HighCompStart_Test))*4; % 4 - for later trial id
+    for blk = 1:length(HighCompStart_Test)
+        Trials_HighComp_Test{blk} = datRS(:,HighCompStart_Test(blk)-PreStimTime*hdr.Fs:HighCompStart_Test(blk)+PostStimTime*hdr.Fs);
+        Signals_HighComp_Test{blk} = Trials_HighComp_Test{blk}(3:16, :);
+    end
+    
+    %% Big Data
+    
+    RPData = [ Trials_LowComp_RP Trials_HighComp_RP ];
+    RPInfoVector = [ LowComp_RP_TrlInfo HighComp_RP_TrlInfo]; 
+    TestData = [ Trials_LowComp_Test Trials_HighComp_Test ];
+    TestInfoVector = [ LowComp_Test_TrlInfo HighComp_Test_TrlInfo ];
+    
+    % Save these in case I need to section the data differently before
+    % preprocessing at another point
+    BigData_RP = [ Trials_LowComp_RP Trials_HighComp_RP ];
+    BDRP_TrlInfoVector = [ LowComp_RP_TrlInfo HighComp_RP_TrlInfo ];
+    BigData_Test = [ Trials_LowComp_Test Trials_HighComp_Test ];
+    BDT_TrlInfoVector = [ LowComp_Test_TrlInfo HighComp_Test_TrlInfo ];
+    
+    BigData = [ BigData_RP BigData_Test ];
+    TrlInfoVector = [ BDRP_TrlInfoVector BDT_TrlInfoVector ];
+    
+    %% Timeline
+    clear TimeLine
+
+    for NumTrl = 1:length(BigData)
+        TimeAux = 1/hdr.Fs:1/hdr.Fs:size(BigData{NumTrl},2)/hdr.Fs;
+        TimeLine{NumTrl} = TimeAux;
+    end
+    
+    %% Wrapping up
+    data = [];
+    data.fsample = hdr.Fs;
+    data.label = hdr.label;
+    data.trial = BigData;
+    data.time = TimeLine;
+    data.trialinfo = TrlInfoVector';
+    cfg = [ ];
+    cfg.channel = 3:16;
+    cfg.demean = 'yes';
+    [data] = ft_preprocessing(cfg,data);
+    
+    [a,b] = strtok(FileName,'.');
+    matfile = fullfile('/home/mdynamics/Desktop/data/mat', [a '.mat']);
+    save(matfile,'data');
+    clear data
+    
+end % end full loop
+
+
+
